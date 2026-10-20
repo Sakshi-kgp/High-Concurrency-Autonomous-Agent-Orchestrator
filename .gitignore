@@ -1,3 +1,12 @@
+# IntelliJ IDEA
 .idea/
-target/
 *.iml
+
+# Maven build files
+target/
+
+# VS Code
+.vscode/
+
+# Environment variables
+.env
