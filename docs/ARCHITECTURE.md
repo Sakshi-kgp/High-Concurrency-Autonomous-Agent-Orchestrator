@@ -40,3 +40,41 @@ These are planned integration points and are not all implemented in the initial 
 - Maven project configured with Spring Boot 3
 - `mvn clean test` completed successfully
 - Embedded Tomcat started on port 8080
+
+## Virtual Thread Execution
+
+### Overview
+
+Java 21 Virtual Threads are used to execute concurrent agent tasks efficiently.
+They are lightweight threads managed by the JVM and are suitable for I/O-bound workloads.
+
+### Configuration
+
+The `VirtualThreadConfig` class provides a Spring-managed ExecutorService bean.
+
+- Bean name: `agentTaskExecutor`
+- Executor: `Executors.newVirtualThreadPerTaskExecutor()`
+- Each submitted task runs on a virtual thread.
+- The executor is managed by Spring and closed during application shutdown.
+
+### Testing
+
+The `VirtualThreadConfigTests` class verifies the executor configuration.
+
+- Submits 100 concurrent tasks.
+- Checks whether each task executes on a virtual thread.
+- Uses assertions to verify successful execution.
+
+### Test Results
+
+Command executed:
+
+`mvn clean test`
+
+Results:
+
+- Tests run: 2
+- Failures: 0
+- Errors: 0
+- Skipped: 0
+- Build status: SUCCESS
