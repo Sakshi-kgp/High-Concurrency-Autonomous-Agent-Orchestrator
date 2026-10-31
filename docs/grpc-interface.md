@@ -100,5 +100,5 @@ The project targets Java 21.
 - Required Maven dependencies: added locally and dependency resolution succeeded.
 - Protobuf Maven code-generation configuration: pending.
 - Generated Java classes: pending verification.
-- gRPC server and registration logic: pending.
-- End-to-end gRPC testing: pending.
+- gRPC server and registration logic: Done.
+- End-to-end gRPC testing: Done
