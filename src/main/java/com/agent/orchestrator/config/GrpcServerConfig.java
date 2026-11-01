@@ -15,11 +15,11 @@ public class GrpcServerConfig {
     private Server grpcServer;
 
     @Bean
-    public Server grpcServer() throws IOException {
+    public Server grpcServer(AgentServiceImpl agentService) throws IOException {
 
         grpcServer = ServerBuilder
                 .forPort(9090)
-                .addService(new AgentServiceImpl())
+                .addService(agentService)
                 .build()
                 .start();
 
@@ -30,7 +30,6 @@ public class GrpcServerConfig {
 
     @PreDestroy
     public void stopGrpcServer() {
-
         if (grpcServer != null) {
             grpcServer.shutdown();
         }

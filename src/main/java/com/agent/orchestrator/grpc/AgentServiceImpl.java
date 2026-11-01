@@ -1,11 +1,21 @@
 package com.agent.orchestrator.grpc;
 
+import com.agent.orchestrator.registry.AgentRegistry;
+import com.agent.orchestrator.registry.RegisteredAgent;
 import com.orchestrator.grpc.AgentRegistrationRequest;
 import com.orchestrator.grpc.AgentRegistrationResponse;
 import com.orchestrator.grpc.AgentServiceGrpc;
 import io.grpc.stub.StreamObserver;
+import org.springframework.stereotype.Component;
 
+@Component
 public class AgentServiceImpl extends AgentServiceGrpc.AgentServiceImplBase {
+
+    private final AgentRegistry registry;
+
+    public AgentServiceImpl(AgentRegistry registry) {
+        this.registry = registry;
+    }
 
     @Override
     public void registerAgent(
@@ -19,11 +29,10 @@ public class AgentServiceImpl extends AgentServiceGrpc.AgentServiceImplBase {
 
         AgentRegistrationResponse response;
 
-        // Validate required registration fields
-        if (agentId.isBlank() ||
-                agentName.isBlank() ||
-                agentType.isBlank() ||
-                agentAddress.isBlank()) {
+        if (agentId.isBlank()
+                || agentName.isBlank()
+                || agentType.isBlank()
+                || agentAddress.isBlank()) {
 
             response = AgentRegistrationResponse.newBuilder()
                     .setSuccess(false)
@@ -32,14 +41,28 @@ public class AgentServiceImpl extends AgentServiceGrpc.AgentServiceImplBase {
                     .build();
 
         } else {
+            RegisteredAgent agent = new RegisteredAgent(
+                    agentId,
+                    agentName,
+                    agentType,
+                    agentAddress
+            );
 
-            System.out.println("Registering agent: " + agentName);
+            boolean registered = registry.register(agent);
 
-            response = AgentRegistrationResponse.newBuilder()
-                    .setSuccess(true)
-                    .setMessage("Agent registered successfully")
-                    .setAgentId(agentId)
-                    .build();
+            if (registered) {
+                response = AgentRegistrationResponse.newBuilder()
+                        .setSuccess(true)
+                        .setMessage("Agent registered successfully")
+                        .setAgentId(agentId)
+                        .build();
+            } else {
+                response = AgentRegistrationResponse.newBuilder()
+                        .setSuccess(false)
+                        .setMessage("Registration failed: Agent ID already exists")
+                        .setAgentId(agentId)
+                        .build();
+            }
         }
 
         responseObserver.onNext(response);
