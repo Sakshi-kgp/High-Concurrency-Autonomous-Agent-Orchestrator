@@ -40,3 +40,26 @@ These are planned integration points and are not all implemented in the initial 
 - Maven project configured with Spring Boot 3
 - `mvn clean test` completed successfully
 - Embedded Tomcat started on port 8080
+
+## Virtual Thread Task Execution
+
+The `AgentTaskExecutionService` provides a common service for submitting agent tasks to the configured ExecutorService.
+
+### Implementation
+
+- Uses the Spring-managed `agentTaskExecutor` bean.
+- Accepts tasks through Java's `Callable<T>` interface.
+- Submits tasks for execution and returns a `Future<T>` to retrieve the result.
+- Uses Java 21 Virtual Threads through the existing executor configuration.
+
+### Concurrency Validation
+
+The `AgentTaskExecutionServiceTests` test validates concurrent task execution.
+
+- Submits 100 tasks to the executor.
+- Uses synchronization controls to coordinate task execution.
+- Tracks the maximum number of simultaneously active tasks.
+- Verifies that tasks execute on Virtual Threads.
+- Confirms that multiple tasks can execute concurrently.
+
+The concurrency test passes as part of the Maven test suite.
