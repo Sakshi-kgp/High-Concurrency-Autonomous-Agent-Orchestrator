@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package agent;
+
+option java_multiple_files = true;
+option java_package = "com.orchestrator.grpc";
+option java_outer_classname = "AgentServiceProto";
+
+service AgentService {
+  rpc RegisterAgent(AgentRegistrationRequest)
+      returns (AgentRegistrationResponse);
+}
+
+message AgentRegistrationRequest {
+  string agent_id = 1;
+  string agent_name = 2;
+  string agent_type = 3;
+  string agent_address = 4;
+}
+
+message AgentRegistrationResponse {
+  bool success = 1;
+  string message = 2;
+  string agent_id = 3;
+}
