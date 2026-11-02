@@ -1,3 +1,4 @@
+
 package com.agent.orchestrator.client;
 
 import com.orchestrator.grpc.AgentRegistrationRequest;
@@ -5,6 +6,9 @@ import com.orchestrator.grpc.AgentRegistrationResponse;
 import com.orchestrator.grpc.AgentServiceGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.StatusRuntimeException;
+
+import java.util.concurrent.TimeUnit;
 
 public class AgentGrpcClient {
 
@@ -35,7 +39,22 @@ public class AgentGrpcClient {
                         .setAgentAddress(agentAddress)
                         .build();
 
-        return blockingStub.registerAgent(request);
+        try {
+            return blockingStub
+                    .withDeadlineAfter(3, TimeUnit.SECONDS)
+                    .registerAgent(request);
+
+        } catch (StatusRuntimeException exception) {
+
+            return AgentRegistrationResponse.newBuilder()
+                    .setSuccess(false)
+                    .setMessage(
+                            "gRPC communication failed: "
+                                    + exception.getStatus().getCode()
+                    )
+                    .setAgentId(agentId)
+                    .build();
+        }
     }
 
     public void shutdown() {

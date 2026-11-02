@@ -40,4 +40,26 @@ class AgentGrpcClientIntegrationTest {
             client.shutdown();
         }
     }
+
+    @Test
+    void clientShouldHandleUnavailableServer() {
+
+        AgentGrpcClient client = new AgentGrpcClient("localhost", 9191);
+
+        try {
+            AgentRegistrationResponse response = client.registerAgent(
+                    "test-failure",
+                    "Failure Test Agent",
+                    "WORKER",
+                    "localhost:8082"
+            );
+
+            assertFalse(response.getSuccess());
+            assertTrue(response.getMessage().contains("gRPC communication failed"));
+
+        } finally {
+            client.shutdown();
+        }
+    }
+
 }
