@@ -60,15 +60,35 @@ class AgentTaskExecutionServiceTests {
             start.countDown();
 
             assertTrue(allReady, "All tasks should start within 10 seconds");
-            assertTrue(completed.await(10, TimeUnit.SECONDS),
-                    "All tasks should complete within 10 seconds");
+
+            assertTrue(
+                    completed.await(10, TimeUnit.SECONDS),
+                    "All tasks should complete within 10 seconds"
+            );
 
             for (Future<Boolean> future : futures) {
                 assertTrue(future.get());
             }
 
-            assertTrue(maxConcurrentTasks.get() > 1,
-                    "Multiple tasks should execute concurrently");
+            assertTrue(
+                    maxConcurrentTasks.get() > 1,
+                    "Multiple tasks should execute concurrently"
+            );
+        }
+    }
+
+    @Test
+    void rejectsNullTask() {
+        VirtualThreadConfig config = new VirtualThreadConfig();
+
+        try (ExecutorService executor = config.agentTaskExecutor()) {
+            AgentTaskExecutionService service =
+                    new AgentTaskExecutionService(executor);
+
+            assertThrows(
+                    NullPointerException.class,
+                    () -> service.submitTask(null)
+            );
         }
     }
 }
