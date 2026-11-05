@@ -91,4 +91,22 @@ class AgentTaskExecutionServiceTests {
             );
         }
     }
+
+    @Test
+    void returnsTaskResult() throws Exception {
+        VirtualThreadConfig config = new VirtualThreadConfig();
+
+        try (ExecutorService executor = config.agentTaskExecutor()) {
+            AgentTaskExecutionService service =
+                    new AgentTaskExecutionService(executor);
+
+            Future<String> result =
+                    service.submitTask(() -> "Task completed");
+
+            assertEquals(
+                    "Task completed",
+                    result.get(5, TimeUnit.SECONDS)
+            );
+        }
+    }
 }
