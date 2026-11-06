@@ -10,6 +10,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -107,6 +108,32 @@ class AgentTaskExecutionServiceTests {
                     "Task completed",
                     result.get(5, TimeUnit.SECONDS)
             );
+        }
+    }
+
+    @Test
+    void propagatesTaskException() throws Exception {
+        VirtualThreadConfig config = new VirtualThreadConfig();
+
+        try (ExecutorService executor = config.agentTaskExecutor()) {
+            AgentTaskExecutionService service =
+                    new AgentTaskExecutionService(executor);
+
+            Future<String> result = service.submitTask(() -> {
+                throw new IllegalStateException("Task failed");
+            });
+
+            ExecutionException exception = assertThrows(
+                    ExecutionException.class,
+                    () -> result.get(5, TimeUnit.SECONDS)
+            );
+
+            assertInstanceOf(
+                    IllegalStateException.class,
+                    exception.getCause()
+            );
+
+            assertEquals("Task failed", exception.getCause().getMessage());
         }
     }
 }
