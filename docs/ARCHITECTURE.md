@@ -63,3 +63,29 @@ The `AgentTaskExecutionServiceTests` test validates concurrent task execution.
 - Confirms that multiple tasks can execute concurrently.
 
 The concurrency test passes as part of the Maven test suite.
+
+
+## Performance Testing
+
+The AgentTaskPerformanceTests class evaluates concurrent task execution using the configured Java 21 Virtual Thread executor.
+
+### Test Configuration
+
+- Number of tasks: 100
+- Simulated task duration: 50 milliseconds
+- Task submission through AgentTaskExecutionService
+- Results collected using Future objects
+
+### Performance Metrics
+
+The test measures:
+
+- Total execution time
+- Task throughput (tasks per second)
+- Average individual task execution time
+
+### Test Validation
+
+The performance test verifies that all submitted tasks complete successfully.
+
+The test is a basic workload measurement and does not represent a formal benchmark against platform threads.
