@@ -167,4 +167,21 @@ class AgentTaskExecutionServiceTests {
             assertTrue(taskCancelled.await(5, TimeUnit.SECONDS));
         }
     }
+
+    @Test
+    void doesNotCancelCompletedTask() throws Exception {
+        VirtualThreadConfig config = new VirtualThreadConfig();
+
+        try (ExecutorService executor = config.agentTaskExecutor()) {
+            AgentTaskExecutionService service =
+                    new AgentTaskExecutionService(executor);
+
+            Future<String> future =
+                    service.submitTask(() -> "Completed");
+
+            assertEquals("Completed", future.get(5, TimeUnit.SECONDS));
+            assertFalse(future.cancel(true));
+            assertFalse(future.isCancelled());
+        }
+    }
 }
