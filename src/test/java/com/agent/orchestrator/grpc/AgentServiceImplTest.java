@@ -1,4 +1,6 @@
+
 package com.agent.orchestrator.grpc;
+
 import com.agent.orchestrator.registry.AgentRegistry;
 import com.orchestrator.grpc.AgentRegistrationRequest;
 import com.orchestrator.grpc.AgentRegistrationResponse;
@@ -12,9 +14,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class AgentServiceImplTest {
 
-    //private final AgentServiceImpl service = new AgentServiceImpl();
     private final AgentRegistry registry = new AgentRegistry();
     private final AgentServiceImpl service = new AgentServiceImpl(registry);
+
     private AgentRegistrationResponse register(
             AgentRegistrationRequest request) {
 
@@ -100,6 +102,10 @@ class AgentServiceImplTest {
         AgentRegistrationResponse response = register(request);
 
         assertFalse(response.getSuccess());
+        assertEquals(
+                "Registration failed: All fields are required",
+                response.getMessage()
+        );
     }
 
     @Test
@@ -116,6 +122,10 @@ class AgentServiceImplTest {
         AgentRegistrationResponse response = register(request);
 
         assertFalse(response.getSuccess());
+        assertEquals(
+                "Registration failed: All fields are required",
+                response.getMessage()
+        );
     }
 
     @Test
@@ -132,7 +142,12 @@ class AgentServiceImplTest {
         AgentRegistrationResponse response = register(request);
 
         assertFalse(response.getSuccess());
+        assertEquals(
+                "Registration failed: All fields are required",
+                response.getMessage()
+        );
     }
+
     @Test
     void registerAgentWithDuplicateIdShouldFail() {
 
