@@ -111,7 +111,13 @@ class AgentServiceImplTest {
                         .setAgentAddress("localhost:50051")
                         .build();
 
-        assertFalse(register(request).getSuccess());
+        AgentRegistrationResponse response = register(request);
+
+        assertFalse(response.getSuccess());
+        assertEquals(
+                "Registration failed: All fields are required",
+                response.getMessage()
+        );
     }
 
     @Test
@@ -139,7 +145,13 @@ class AgentServiceImplTest {
                         .setAgentAddress("")
                         .build();
 
-        assertFalse(register(request).getSuccess());
+        AgentRegistrationResponse response = register(request);
+
+        assertFalse(response.getSuccess());
+        assertEquals(
+                "Registration failed: All fields are required",
+                response.getMessage()
+        );
     }
 
     @Test
