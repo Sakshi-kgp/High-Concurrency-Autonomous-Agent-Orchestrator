@@ -89,7 +89,6 @@ The test measures:
 The performance test verifies that all submitted tasks complete successfully.
 
 The test is a basic workload measurement and does not represent a formal benchmark against platform threads.
-@'
 
 ## Task Cancellation and Exception Handling
 
@@ -107,4 +106,3 @@ The AgentTaskExecutionService supports task cancellation through Future objects.
 - Confirms that ExecutionException retains the original cause.
 
 These behaviours are validated through automated JUnit tests.
-'@ | Add-Content docs/ARCHITECTURE.md
