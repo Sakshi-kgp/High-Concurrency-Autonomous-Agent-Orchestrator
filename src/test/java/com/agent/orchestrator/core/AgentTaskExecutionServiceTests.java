@@ -11,6 +11,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -183,5 +184,21 @@ class AgentTaskExecutionServiceTests {
             assertFalse(future.cancel(true));
             assertFalse(future.isCancelled());
         }
+    }
+
+    @Test
+    void rejectsTasksAfterExecutorShutdown() {
+        VirtualThreadConfig config = new VirtualThreadConfig();
+
+        ExecutorService executor = config.agentTaskExecutor();
+        AgentTaskExecutionService service =
+                new AgentTaskExecutionService(executor);
+
+        executor.shutdown();
+
+        assertThrows(
+                RejectedExecutionException.class,
+                () -> service.submitTask(() -> "Should not execute")
+        );
     }
 }
