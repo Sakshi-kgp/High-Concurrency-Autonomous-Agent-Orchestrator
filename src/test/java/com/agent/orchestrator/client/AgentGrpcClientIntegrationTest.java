@@ -55,11 +55,74 @@ class AgentGrpcClientIntegrationTest {
             );
 
             assertFalse(response.getSuccess());
-            assertTrue(response.getMessage().contains("gRPC communication failed"));
+            assertTrue(response.getMessage().contains(
+                    "gRPC communication failed"
+            ));
 
         } finally {
             client.shutdown();
         }
     }
 
+    @Test
+    void clientShouldRejectInvalidRegistration() {
+
+        String agentId = "invalid-" + UUID.randomUUID();
+
+        AgentGrpcClient client = new AgentGrpcClient("localhost", 9090);
+
+        try {
+            AgentRegistrationResponse response = client.registerAgent(
+                    agentId,
+                    "",
+                    "WORKER",
+                    "localhost:8083"
+            );
+
+            assertFalse(response.getSuccess());
+            assertEquals(
+                    "Registration failed: All fields are required",
+                    response.getMessage()
+            );
+            assertTrue(registry.findById(agentId).isEmpty());
+
+        } finally {
+            client.shutdown();
+        }
+    }
+
+    @Test
+    void clientShouldRejectDuplicateRegistration() {
+
+        String agentId = "duplicate-" + UUID.randomUUID();
+
+        AgentGrpcClient client = new AgentGrpcClient("localhost", 9090);
+
+        try {
+            AgentRegistrationResponse firstResponse = client.registerAgent(
+                    agentId,
+                    "First Agent",
+                    "WORKER",
+                    "localhost:8084"
+            );
+
+            AgentRegistrationResponse secondResponse = client.registerAgent(
+                    agentId,
+                    "Second Agent",
+                    "WORKER",
+                    "localhost:8085"
+            );
+
+            assertTrue(firstResponse.getSuccess());
+            assertFalse(secondResponse.getSuccess());
+            assertEquals(
+                    "Registration failed: Agent ID already exists",
+                    secondResponse.getMessage()
+            );
+            assertTrue(registry.findById(agentId).isPresent());
+
+        } finally {
+            client.shutdown();
+        }
+    }
 }
