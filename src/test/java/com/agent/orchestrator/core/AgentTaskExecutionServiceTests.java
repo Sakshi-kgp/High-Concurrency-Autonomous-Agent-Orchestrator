@@ -271,4 +271,33 @@ class AgentTaskExecutionServiceTests {
             );
         }
     }
+
+    @Test
+    void executesSimulatedAgentWorkloads() throws Exception {
+        VirtualThreadConfig config = new VirtualThreadConfig();
+
+        try (ExecutorService executor = config.agentTaskExecutor()) {
+            AgentTaskExecutionService service =
+                    new AgentTaskExecutionService(executor);
+
+            int agentCount = 50;
+            List<Future<Integer>> futures = new ArrayList<>();
+
+            for (int i = 1; i <= agentCount; i++) {
+                final int agentId = i;
+
+                futures.add(service.submitTask(() -> {
+                    Thread.sleep((agentId % 5 + 1) * 100);
+                    return agentId;
+                }));
+            }
+
+            for (int i = 0; i < agentCount; i++) {
+                assertEquals(
+                        i + 1,
+                        futures.get(i).get(5, TimeUnit.SECONDS)
+                );
+            }
+        }
+    }
 }
