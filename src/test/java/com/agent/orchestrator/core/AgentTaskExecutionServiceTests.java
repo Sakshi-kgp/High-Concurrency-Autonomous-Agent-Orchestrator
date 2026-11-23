@@ -300,4 +300,71 @@ class AgentTaskExecutionServiceTests {
             }
         }
     }
+
+    @Test
+    void executesNewTaskAfterPreviousTaskFails() throws Exception {
+        VirtualThreadConfig config = new VirtualThreadConfig();
+
+        try (ExecutorService executor = config.agentTaskExecutor()) {
+            AgentTaskExecutionService service =
+                    new AgentTaskExecutionService(executor);
+
+            Future<String> failedTask = service.submitTask(() -> {
+                throw new IllegalStateException("Simulated failure");
+            });
+
+            assertThrows(
+                    ExecutionException.class,
+                    () -> failedTask.get(5, TimeUnit.SECONDS)
+            );
+
+            Future<String> nextTask =
+                    service.submitTask(() -> "Recovery successful");
+
+            assertEquals(
+                    "Recovery successful",
+                    nextTask.get(5, TimeUnit.SECONDS)
+            );
+        }
+    }
+
+    @Test
+    void executesNewTaskAfterPreviousTaskTimesOut() throws Exception {
+        VirtualThreadConfig config = new VirtualThreadConfig();
+
+        try (ExecutorService executor = config.agentTaskExecutor()) {
+            AgentTaskExecutionService service =
+                    new AgentTaskExecutionService(executor);
+
+            CountDownLatch taskStarted = new CountDownLatch(1);
+            CountDownLatch taskCancelled = new CountDownLatch(1);
+
+            assertThrows(
+                    TimeoutException.class,
+                    () -> service.executeTaskWithTimeout(() -> {
+                        taskStarted.countDown();
+
+                        try {
+                            new CountDownLatch(1).await();
+                        } catch (InterruptedException e) {
+                            taskCancelled.countDown();
+                            Thread.currentThread().interrupt();
+                        }
+
+                        return null;
+                    }, 100, TimeUnit.MILLISECONDS)
+            );
+
+            assertTrue(taskStarted.await(5, TimeUnit.SECONDS));
+            assertTrue(taskCancelled.await(5, TimeUnit.SECONDS));
+
+            Future<String> nextTask =
+                    service.submitTask(() -> "Recovery after timeout");
+
+            assertEquals(
+                    "Recovery after timeout",
+                    nextTask.get(5, TimeUnit.SECONDS)
+            );
+        }
+    }
 }
