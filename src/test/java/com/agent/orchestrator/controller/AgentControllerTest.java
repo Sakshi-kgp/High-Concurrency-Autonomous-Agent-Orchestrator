@@ -1,9 +1,11 @@
 
 package com.agent.orchestrator.controller;
 
+import com.agent.orchestrator.core.AgentTaskWorkflowService;
 import com.agent.orchestrator.dto.AgentRegistrationRequest;
 import com.agent.orchestrator.registry.RegisteredAgent;
 import com.agent.orchestrator.service.AgentRegistrationService;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -13,8 +15,10 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -26,6 +30,9 @@ class AgentControllerTest {
 
     @MockBean
     private AgentRegistrationService registrationService;
+
+    @MockBean
+    private AgentTaskWorkflowService workflowService;
 
     @Test
     void shouldRegisterAgentSuccessfully() throws Exception {
@@ -195,5 +202,84 @@ class AgentControllerTest {
 
         mockMvc.perform(delete("/api/agents/unknown"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldExecuteTaskForRegisteredAgent() throws Exception {
+        doReturn(CompletableFuture.completedFuture("Task completed"))
+                .when(workflowService)
+                .submitAgentTask(eq("agent-101"), any(Callable.class));
+
+        mockMvc.perform(post("/api/agents/agent-101/tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "taskName": "Data Processing",
+                                    "durationMillis": 100
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.agentId").value("agent-101"))
+                .andExpect(jsonPath("$.taskName").value("Data Processing"))
+                .andExpect(jsonPath("$.result").value("Task completed"));
+    }
+
+    @Test
+    void shouldRejectTaskForUnregisteredAgent() throws Exception {
+        when(workflowService.submitAgentTask(
+                eq("unknown"),
+                any(Callable.class)
+        )).thenThrow(new IllegalArgumentException("Agent not found: unknown"));
+
+        mockMvc.perform(post("/api/agents/unknown/tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "taskName": "Data Processing",
+                                    "durationMillis": 100
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message")
+                        .value("Agent not found: unknown"));
+    }
+
+    @Test
+    void shouldRejectInvalidTaskRequest() throws Exception {
+        mockMvc.perform(post("/api/agents/agent-101/tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "taskName": "",
+                                    "durationMillis": 100
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void shouldReturnInternalServerErrorWhenTaskFails()
+            throws Exception {
+
+        doReturn(CompletableFuture.failedFuture(
+                new IllegalStateException("Task execution failed")
+        )).when(workflowService)
+                .submitAgentTask(eq("agent-101"), any(Callable.class));
+
+        mockMvc.perform(post("/api/agents/agent-101/tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "taskName": "Data Processing",
+                                    "durationMillis": 100
+                                }
+                                """))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message")
+                        .value("Task execution failed"));
     }
 }
