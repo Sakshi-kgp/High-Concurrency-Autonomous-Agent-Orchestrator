@@ -43,7 +43,7 @@ These are planned integration points and are not all implemented in the initial 
 
 ## Virtual Thread Task Execution
 
-The `AgentTaskExecutionService` provides a common service for submitting agent tasks to the configured ExecutorService.
+The `AgentTaskExecutionService` provides a common service for submitting agent tasks to the configured `ExecutorService`.
 
 ### Implementation
 
@@ -54,7 +54,7 @@ The `AgentTaskExecutionService` provides a common service for submitting agent t
 
 ### Concurrency Validation
 
-The `AgentTaskExecutionServiceTests` test validates concurrent task execution.
+The `AgentTaskExecutionServiceTests` class validates concurrent task execution.
 
 - Submits 100 tasks to the executor.
 - Uses synchronization controls to coordinate task execution.
@@ -64,45 +64,96 @@ The `AgentTaskExecutionServiceTests` test validates concurrent task execution.
 
 The concurrency test passes as part of the Maven test suite.
 
+## Task Timeout and Cancellation Handling
 
-## Performance Testing
+The `AgentTaskExecutionService` supports task timeout and cancellation.
 
-The AgentTaskPerformanceTests class evaluates concurrent task execution using the configured Java 21 Virtual Thread executor.
+### Timeout Implementation
 
-### Test Configuration
-
-- Number of tasks: 100
-- Simulated task duration: 50 milliseconds
-- Task submission through AgentTaskExecutionService
-- Results collected using Future objects
-
-### Performance Metrics
-
-The test measures:
-
-- Total execution time
-- Task throughput (tasks per second)
-- Average individual task execution time
-
-### Test Validation
-
-The performance test verifies that all submitted tasks complete successfully.
-
-The test is a basic workload measurement and does not represent a formal benchmark against platform threads.
-
-## Task Cancellation and Exception Handling
-
-The AgentTaskExecutionService supports task cancellation through Future objects.
+- Provides `executeTaskWithTimeout()` for timed task execution.
+- Accepts a task, timeout value, and `TimeUnit`.
+- Uses `Future.get(timeout, unit)` to enforce the execution time limit.
+- Automatically cancels the task when a timeout occurs.
+- Cancels the task if the calling thread is interrupted.
+- Rejects null tasks, null time units, and non-positive timeout values.
 
 ### Cancellation Validation
 
 - Verifies cancellation of running tasks using `Future.cancel(true)`.
 - Confirms that cancelled tasks respond to interruption.
 - Verifies that completed tasks cannot be cancelled.
-
-### Exception Handling
-
-- Verifies that task exceptions are propagated through Future.
-- Confirms that ExecutionException retains the original cause.
+- Tests automatic cancellation after timeout.
 
 These behaviours are validated through automated JUnit tests.
+
+## Simulated Agent Workload Testing
+
+The `AgentTaskExecutionServiceTests` class validates execution of simulated agent workloads.
+
+### Test Configuration
+
+- Number of simulated agents: 50
+- Different task durations: 100 to 500 milliseconds
+- Tasks submitted through `AgentTaskExecutionService`
+- Results collected using `Future` objects
+
+### Test Validation
+
+- Verifies successful completion of all 50 tasks.
+- Confirms that each task returns its expected agent identifier.
+- Uses the configured Java 21 Virtual Thread executor.
+
+## Performance Testing
+
+The `AgentTaskPerformanceTests` class evaluates concurrent execution under different workload sizes.
+
+### Test Configuration
+
+The benchmark evaluates the following workload sizes:
+
+- 50 tasks
+- 100 tasks
+- 250 tasks
+- 500 tasks
+
+Each task simulates approximately 50 milliseconds of work.
+
+### Performance Metrics
+
+The test measures:
+
+- Total execution time
+- Throughput in tasks per second
+- Average task execution latency
+- Peak number of simultaneously active tasks
+- Approximate JVM heap memory change
+
+### Sample Performance Result
+
+One observed result for the 500-task workload:
+
+| Metric | Result |
+|---|---:|
+| Tasks submitted | 500 |
+| Throughput | 8,783.12 tasks/second |
+| Average task execution time | 51.34 ms |
+| Peak concurrent tasks | 500 |
+| Approximate memory change | 1 MB |
+
+These values represent one benchmark run and may vary across executions and hardware configurations.
+
+### Benchmark Limitations
+
+- The benchmark uses simulated workloads rather than real agent operations.
+- Memory change is an approximate JVM heap snapshot, not total process memory usage.
+- Peak concurrency represents active submitted tasks, not the total number of JVM Virtual Threads.
+- The benchmark does not compare Virtual Threads against platform threads.
+- Results are intended for basic performance evaluation, not formal benchmarking.
+
+## Concurrency Limitations
+
+- Virtual Threads do not eliminate CPU, memory, or external resource constraints.
+- Blocking operations can still affect overall application performance.
+- Task cancellation depends on tasks responding appropriately to interruption.
+- Timeout cancellation requests interruption but cannot guarantee termination of tasks that ignore interruption.
+- Actual agent workflow integration remains dependent on the shared orchestration interfaces.
