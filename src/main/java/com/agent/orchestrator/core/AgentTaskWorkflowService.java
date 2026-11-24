@@ -1,8 +1,10 @@
 
 package com.agent.orchestrator.core;
 
+import com.agent.orchestrator.dashboard.DashboardMetricsService;
 import com.agent.orchestrator.registry.RegisteredAgent;
 import com.agent.orchestrator.service.AgentRegistrationService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
@@ -14,13 +16,28 @@ public class AgentTaskWorkflowService {
 
     private final AgentRegistrationService registrationService;
     private final AgentTaskExecutionService executionService;
+    private final DashboardMetricsService metricsService;
+
+    @Autowired
+    public AgentTaskWorkflowService(
+            AgentRegistrationService registrationService,
+            AgentTaskExecutionService executionService,
+            DashboardMetricsService metricsService) {
+
+        this.registrationService = registrationService;
+        this.executionService = executionService;
+        this.metricsService = metricsService;
+    }
 
     public AgentTaskWorkflowService(
             AgentRegistrationService registrationService,
             AgentTaskExecutionService executionService) {
 
-        this.registrationService = registrationService;
-        this.executionService = executionService;
+        this(
+                registrationService,
+                executionService,
+                new DashboardMetricsService()
+        );
     }
 
     public <T> Future<T> submitAgentTask(
@@ -28,9 +45,7 @@ public class AgentTaskWorkflowService {
             Callable<T> task) {
 
         if (agentId == null || agentId.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Agent ID is required"
-            );
+            throw new IllegalArgumentException("Agent ID is required");
         }
 
         Objects.requireNonNull(task, "Task cannot be null");
@@ -41,6 +56,28 @@ public class AgentTaskWorkflowService {
                         "Agent not found: " + agentId
                 ));
 
-        return executionService.submitTask(task);
+        Callable<T> monitoredTask = () -> {
+            long startTime = System.nanoTime();
+            metricsService.taskStarted();
+
+            try {
+                T result = task.call();
+
+                long duration = (System.nanoTime() - startTime)
+                        / 1_000_000;
+
+                metricsService.taskCompleted(duration);
+                return result;
+
+            } catch (Exception | Error exception) {
+                long duration = (System.nanoTime() - startTime)
+                        / 1_000_000;
+
+                metricsService.taskFailed(duration);
+                throw exception;
+            }
+        };
+
+        return executionService.submitTask(monitoredTask);
     }
 }

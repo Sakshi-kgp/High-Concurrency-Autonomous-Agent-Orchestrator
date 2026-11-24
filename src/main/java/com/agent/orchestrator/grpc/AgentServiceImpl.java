@@ -1,71 +1,78 @@
+
 package com.agent.orchestrator.grpc;
 
-import com.agent.orchestrator.registry.AgentRegistry;
-import com.agent.orchestrator.registry.RegisteredAgent;
-import com.orchestrator.grpc.AgentRegistrationRequest;
+import com.agent.orchestrator.dto.AgentRegistrationRequest;
+import com.agent.orchestrator.service.AgentRegistrationService;
 import com.orchestrator.grpc.AgentRegistrationResponse;
 import com.orchestrator.grpc.AgentServiceGrpc;
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import org.springframework.stereotype.Component;
 
 @Component
 public class AgentServiceImpl extends AgentServiceGrpc.AgentServiceImplBase {
 
-    private final AgentRegistry registry;
+    private final AgentRegistrationService registrationService;
 
-    public AgentServiceImpl(AgentRegistry registry) {
-        this.registry = registry;
+    public AgentServiceImpl(
+            AgentRegistrationService registrationService) {
+        this.registrationService = registrationService;
     }
 
     @Override
     public void registerAgent(
-            AgentRegistrationRequest request,
+            com.orchestrator.grpc.AgentRegistrationRequest request,
             StreamObserver<AgentRegistrationResponse> responseObserver) {
 
         String agentId = request.getAgentId();
-        String agentName = request.getAgentName();
-        String agentType = request.getAgentType();
-        String agentAddress = request.getAgentAddress();
 
-        AgentRegistrationResponse response;
+        try {
+            AgentRegistrationRequest registrationRequest =
+                    new AgentRegistrationRequest(
+                            request.getAgentId(),
+                            request.getAgentName(),
+                            request.getAgentType(),
+                            request.getAgentAddress()
+                    );
 
-        if (agentId.isBlank()
-                || agentName.isBlank()
-                || agentType.isBlank()
-                || agentAddress.isBlank()) {
+            boolean registered =
+                    registrationService.registerAgent(registrationRequest);
 
-            response = AgentRegistrationResponse.newBuilder()
-                    .setSuccess(false)
-                    .setMessage("Registration failed: All fields are required")
-                    .setAgentId(agentId)
-                    .build();
+            AgentRegistrationResponse response =
+                    AgentRegistrationResponse.newBuilder()
+                            .setSuccess(registered)
+                            .setMessage(registered
+                                    ? "Agent registered successfully"
+                                    : "Registration failed: Agent ID already exists")
+                            .setAgentId(agentId.trim())
+                            .build();
 
-        } else {
-            RegisteredAgent agent = new RegisteredAgent(
-                    agentId,
-                    agentName,
-                    agentType,
-                    agentAddress
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+
+        } catch (IllegalArgumentException exception) {
+
+            AgentRegistrationResponse response =
+                    AgentRegistrationResponse.newBuilder()
+                            .setSuccess(false)
+                            .setMessage(
+                                    "Registration failed: "
+                                            + exception.getMessage()
+                            )
+                            .setAgentId(agentId)
+                            .build();
+
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+
+        } catch (Exception exception) {
+
+            responseObserver.onError(
+                    Status.INTERNAL
+                            .withDescription("Agent registration failed")
+                            .withCause(exception)
+                            .asRuntimeException()
             );
-
-            boolean registered = registry.register(agent);
-
-            if (registered) {
-                response = AgentRegistrationResponse.newBuilder()
-                        .setSuccess(true)
-                        .setMessage("Agent registered successfully")
-                        .setAgentId(agentId)
-                        .build();
-            } else {
-                response = AgentRegistrationResponse.newBuilder()
-                        .setSuccess(false)
-                        .setMessage("Registration failed: Agent ID already exists")
-                        .setAgentId(agentId)
-                        .build();
-            }
         }
-
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
     }
 }

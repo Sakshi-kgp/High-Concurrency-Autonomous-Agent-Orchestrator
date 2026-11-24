@@ -1,8 +1,12 @@
+
 package com.agent.orchestrator.grpc;
+
 import com.agent.orchestrator.registry.AgentRegistry;
+import com.agent.orchestrator.service.AgentRegistrationService;
 import com.orchestrator.grpc.AgentRegistrationRequest;
 import com.orchestrator.grpc.AgentRegistrationResponse;
 import io.grpc.stub.StreamObserver;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -12,9 +16,19 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class AgentServiceImplTest {
 
-    //private final AgentServiceImpl service = new AgentServiceImpl();
-    private final AgentRegistry registry = new AgentRegistry();
-    private final AgentServiceImpl service = new AgentServiceImpl(registry);
+    private AgentRegistry registry;
+    private AgentServiceImpl service;
+
+    @BeforeEach
+    void setUp() {
+        registry = new AgentRegistry();
+
+        AgentRegistrationService registrationService =
+                new AgentRegistrationService(registry);
+
+        service = new AgentServiceImpl(registrationService);
+    }
+
     private AgentRegistrationResponse register(
             AgentRegistrationRequest request) {
 
@@ -37,13 +51,12 @@ class AgentServiceImplTest {
 
                     @Override
                     public void onCompleted() {
-                        // Registration completed
                     }
                 }
         );
 
-        assertTrue(errors.isEmpty(), "RPC should not return an error");
-        assertEquals(1, responses.size(), "RPC should return one response");
+        assertTrue(errors.isEmpty());
+        assertEquals(1, responses.size());
 
         return responses.get(0);
     }
@@ -64,6 +77,7 @@ class AgentServiceImplTest {
         assertTrue(response.getSuccess());
         assertEquals("Agent registered successfully", response.getMessage());
         assertEquals("agent-001", response.getAgentId());
+        assertEquals(1, registry.count());
     }
 
     @Test
@@ -97,9 +111,7 @@ class AgentServiceImplTest {
                         .setAgentAddress("localhost:50051")
                         .build();
 
-        AgentRegistrationResponse response = register(request);
-
-        assertFalse(response.getSuccess());
+        assertFalse(register(request).getSuccess());
     }
 
     @Test
@@ -113,9 +125,7 @@ class AgentServiceImplTest {
                         .setAgentAddress("localhost:50051")
                         .build();
 
-        AgentRegistrationResponse response = register(request);
-
-        assertFalse(response.getSuccess());
+        assertFalse(register(request).getSuccess());
     }
 
     @Test
@@ -129,10 +139,9 @@ class AgentServiceImplTest {
                         .setAgentAddress("")
                         .build();
 
-        AgentRegistrationResponse response = register(request);
-
-        assertFalse(response.getSuccess());
+        assertFalse(register(request).getSuccess());
     }
+
     @Test
     void registerAgentWithDuplicateIdShouldFail() {
 
@@ -144,17 +153,38 @@ class AgentServiceImplTest {
                         .setAgentAddress("localhost:50051")
                         .build();
 
-        AgentRegistrationResponse firstResponse = register(request);
+        assertTrue(register(request).getSuccess());
+
         AgentRegistrationResponse secondResponse = register(request);
 
-        assertTrue(firstResponse.getSuccess());
         assertFalse(secondResponse.getSuccess());
-
         assertEquals(
                 "Registration failed: Agent ID already exists",
                 secondResponse.getMessage()
         );
 
         assertEquals(1, registry.count());
+    }
+
+    @Test
+    void registrationShouldTrimAgentFields() {
+
+        AgentRegistrationRequest request =
+                AgentRegistrationRequest.newBuilder()
+                        .setAgentId(" agent-trim ")
+                        .setAgentName(" Research Agent ")
+                        .setAgentType(" worker ")
+                        .setAgentAddress(" localhost:50051 ")
+                        .build();
+
+        AgentRegistrationResponse response = register(request);
+
+        assertTrue(response.getSuccess());
+        assertEquals("agent-trim", response.getAgentId());
+
+        assertEquals(
+                "Research Agent",
+                registry.findById("agent-trim").orElseThrow().agentName()
+        );
     }
 }

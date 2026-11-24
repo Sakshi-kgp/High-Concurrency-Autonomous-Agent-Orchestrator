@@ -7,6 +7,8 @@ The High-Concurrency Autonomous Agent Orchestrator is a Java 21 and Spring Boot 
 
 The application supports agent registration, retrieval, deregistration, task submission, and concurrent task execution using Java 21 Virtual Threads.
 
+It provides REST and gRPC communication interfaces, a shared agent registry, task execution monitoring, and an interactive terminal dashboard.
+
 ## Technology Stack
 
 - Java 21
@@ -14,16 +16,20 @@ The application supports agent registration, retrieval, deregistration, task sub
 - Maven
 - REST APIs
 - gRPC for service communication
+- Java 21 Virtual Threads
+- ConcurrentHashMap for agent registration
+- Lanterna for interactive terminal dashboard
 - JUnit 5 and Mockito for testing
 - Redis for distributed coordination in a later phase
 
 ## Package Structure
 
 - `com.agent.orchestrator` - Application entry point
-- `com.agent.orchestrator.config` - Application configuration and Virtual Thread executor
+- `com.agent.orchestrator.config` - Application and Virtual Thread configuration
 - `com.agent.orchestrator.client` - gRPC client communication
 - `com.agent.orchestrator.controller` - REST API controllers
 - `com.agent.orchestrator.core` - Task execution and workflow orchestration
+- `com.agent.orchestrator.dashboard` - Terminal dashboard and concurrent task metrics
 - `com.agent.orchestrator.dto` - Request and response objects
 - `com.agent.orchestrator.exception` - Exception handling
 - `com.agent.orchestrator.grpc` - gRPC service implementation
@@ -34,11 +40,13 @@ The application supports agent registration, retrieval, deregistration, task sub
 
 The application entry point initializes the Spring application context.
 
-The configuration layer manages the Virtual Thread executor. The registry maintains registered agents using a thread-safe data structure.
+The configuration layer manages the Virtual Thread executor and gRPC server lifecycle. The registry maintains registered agents using a thread-safe data structure.
 
-The service and core layers handle agent management, task submission, and execution.
+The service and core layers handle agent management, task submission, execution, timeout handling, and cancellation.
 
 REST and gRPC components provide communication interfaces without coupling the core execution logic to a specific communication protocol.
+
+The dashboard layer collects task execution metrics and displays the current application status through an interactive terminal interface.
 
 ## Implemented Integration Components
 
@@ -48,7 +56,13 @@ REST and gRPC components provide communication interfaces without coupling the c
 - Agent task submission through REST
 - Shared agent registry
 - gRPC service definitions and communication components
+- Configurable gRPC server port and graceful shutdown
+- Shared agent registration service across REST and gRPC
+- REST and gRPC cross-protocol integration testing
 - Concurrent task execution and timeout handling
+- Interactive terminal dashboard using Lanterna
+- Real-time task metrics: active, completed, failed, and average execution time
+- Virtual Threads versus Platform Threads performance comparison
 
 Redis-backed distributed coordination and distributed locking remain planned for a later phase.
 
@@ -152,26 +166,29 @@ The test measures:
 - Peak number of simultaneously active tasks
 - Approximate JVM heap memory change
 
-### Sample Performance Result
+### Sample Performance Results
 
-One previously observed result for the 500-task workload:
+One observed benchmark run comparing Virtual Threads and Platform Threads for 500 simulated I/O-bound tasks:
 
-| Metric | Result |
-|---|---:|
-| Tasks submitted | 500 |
-| Throughput | 8,783.12 tasks/second |
-| Average task execution time | 51.34 ms |
-| Peak concurrent tasks | 500 |
-| Approximate memory change | 1 MB |
+| Metric | Virtual Threads | Platform Threads |
+|---|---:|---:|
+| Tasks submitted | 500 | 500 |
+| Execution time | 55 ms | 811 ms |
+| Throughput | 8,966.78 tasks/sec | 616.15 tasks/sec |
+| Average latency | 52.47 ms | 418.41 ms |
+| Peak concurrency | 500 | 32 |
+| Approximate heap change | 1 MB | 2 MB |
+
+Virtual Threads achieved approximately 14.55 times the throughput in this particular workload.
 
 These values represent one benchmark run and may vary across executions and hardware configurations.
 
 ### Benchmark Limitations
 
-- The benchmark uses simulated workloads rather than real agent operations.
+- The benchmark uses simulated I/O-bound workloads rather than real agent operations.
 - Memory change is an approximate JVM heap snapshot, not total process memory usage.
 - Peak concurrency represents active submitted tasks, not the total number of JVM Virtual Threads.
-- The benchmark does not compare Virtual Threads against platform threads.
+- Results may vary depending on hardware and JVM conditions.
 - Results are intended for basic performance evaluation, not formal benchmarking.
 
 ## Agent Registration and Management
@@ -184,6 +201,7 @@ The `AgentRegistry` maintains registered agents using `ConcurrentHashMap`.
 - Retrieves agents using their unique agent ID.
 - Returns a list of all registered agents.
 - Provides the current number of registered agents.
+- Supports agent deregistration.
 
 The `AgentRegistrationService` validates agent details and manages registration, retrieval, and deregistration.
 
@@ -204,6 +222,33 @@ The `AgentRegistrationService` validates agent details and manages registration,
 - Returns HTTP 201 CREATED for successful registration.
 - Returns HTTP 409 CONFLICT for duplicate agent IDs.
 - Returns HTTP 400 BAD REQUEST for invalid registration requests.
+
+## gRPC Communication
+
+The application provides gRPC-based agent registration through the `AgentServiceImpl` service implementation.
+
+### gRPC Components
+
+- `AgentServiceImpl` handles incoming agent registration requests.
+- `AgentGrpcClient` provides client-side communication.
+- `GrpcServerConfig` manages the gRPC server lifecycle.
+- The gRPC server uses a configurable port with a default value of 9090.
+- The server is shut down through Spring's `@PreDestroy` lifecycle hook.
+
+### Shared Registration
+
+REST and gRPC use the same `AgentRegistrationService` and `AgentRegistry`.
+
+This ensures that agents registered through either communication interface are available through the other interface.
+
+### Integration Testing
+
+The integration tests verify:
+
+- Agent registration through the gRPC server.
+- Graceful handling of an unavailable gRPC server.
+- Visibility of REST-registered agents through gRPC.
+- Visibility of gRPC-registered agents through REST.
 
 ## Agent Task Workflow Integration
 
@@ -244,6 +289,33 @@ The endpoint:
 
 The endpoint supports task execution through a REST interface while retaining the asynchronous `Future`-based execution mechanism internally.
 
+## Dashboard and Task Monitoring
+
+The dashboard module provides an interactive terminal interface using the Lanterna library.
+
+### Dashboard Implementation
+
+The `TerminalDashboard` component implements Spring Boot's `ApplicationRunner` interface.
+
+- Dashboard activation is controlled through the `dashboard.enabled` property.
+- The dashboard runs on a Java 21 Virtual Thread.
+- The screen refreshes every second.
+- Pressing `Q` exits the dashboard screen.
+
+### Dashboard Metrics
+
+The `DashboardMetricsService` maintains thread-safe execution metrics.
+
+- Number of active tasks.
+- Number of completed tasks.
+- Number of failed tasks.
+- Total number of executed tasks.
+- Average task execution time in milliseconds.
+
+`AtomicLong` is used for active task tracking, while `LongAdder` is used for concurrent completed-task, failed-task, and execution-time updates.
+
+The `AgentTaskWorkflowService` updates these metrics during task execution.
+
 ## REST API Testing
 
 The `AgentControllerTest` class validates REST API behaviour using Spring MockMvc and Mockito.
@@ -272,20 +344,20 @@ The tests cover:
 - Timeout cancellation requests interruption but cannot guarantee termination of tasks that ignore interruption.
 - The current agent workload uses simulated tasks rather than production agent operations.
 - Redis-based distributed coordination is not yet implemented.
-- The performance benchmark does not provide a formal comparison against platform threads.
+- The performance benchmark uses a simulated workload and is not a formal production benchmark.
 
 ## Final Validation
 
-The complete Maven test suite was executed after REST workflow integration.
+The complete Maven test suite was executed successfully after REST, gRPC, Virtual Thread, dashboard, and workflow integration.
 
 **Latest validation result:**
 
 | Metric | Result |
 |---|---:|
-| Total tests | 41 |
+| Total tests | 44 |
 | Failures | 0 |
 | Errors | 0 |
 | Skipped | 0 |
 | Build status | SUCCESS |
 
-All 41 tests passed successfully, covering Virtual Thread execution, concurrency, task cancellation, timeout handling, performance evaluation, agent registration, REST operations, gRPC components, and workflow integration.
+All 44 tests passed successfully, covering Virtual Thread execution, concurrency, timeout and cancellation handling, performance evaluation, agent registration, REST operations, gRPC communication, cross-protocol integration, and task workflow integration.
