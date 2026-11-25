@@ -1,3 +1,4 @@
+
 package com.agent.orchestrator.registry;
 
 import org.springframework.stereotype.Component;
@@ -13,22 +14,22 @@ public class AgentRegistry {
             new ConcurrentHashMap<>();
 
     public boolean register(RegisteredAgent agent) {
-
         return agents.putIfAbsent(agent.agentId(), agent) == null;
     }
 
     public Optional<RegisteredAgent> findById(String agentId) {
-
         return Optional.ofNullable(agents.get(agentId));
     }
 
     public List<RegisteredAgent> findAll() {
-
         return List.copyOf(agents.values());
     }
 
-    public int count() {
+    public boolean deregister(String agentId) {
+        return agents.remove(agentId) != null;
+    }
 
+    public int count() {
         return agents.size();
     }
 }
